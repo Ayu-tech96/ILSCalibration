@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ILS Calibration Suite — AAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════ */
+:root{
+  --bg:#060d1a;
+  --surface:#0b1628;
+  --card:#0f1e35;
+  --card2:#132240;
+  --border:#1a3055;
+  --border2:#234070;
+  --accent:#00d4ff;
+  --accent2:#0090cc;
+  --accent3:#005580;
+  --success:#00e5a0;
+  --warn:#ffb020;
+  --danger:#ff3d5a;
+  --purple:#a855f7;
+  --text:#c8dff0;
+  --text2:#7fa8cc;
+  --muted:#3d6080;
+  --mono:'Share Tech Mono',monospace;
+  --head:'Orbitron',sans-serif;
+  --body:'Exo 2',sans-serif;
+  --glow:0 0 20px rgba(0,212,255,.25);
+  --glow2:0 0 40px rgba(0,212,255,.12);
+  --r:8px;
+  --r2:12px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--body);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* animated grid bg */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(0,212,255,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,212,255,.03) 1px,transparent 1px);
+  background-size:40px 40px;
+  pointer-events:none;z-index:0;
+  animation:gridMove 60s linear infinite;
+}
+@keyframes gridMove{from{background-position:0 0}to{background-position:40px 40px}}
+
+/* corner scan line */
+body::after{
+  content:'';position:fixed;top:0;left:0;right:0;
+  height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  z-index:100;animation:scanH 4s ease-in-out infinite;opacity:.6;
+}
+@keyframes scanH{0%,100%{transform:scaleX(0);opacity:0}50%{transform:scaleX(1);opacity:.6}}
+
+/* ── HEADER ── */
+header{
+  position:relative;z-index:50;
+  background:rgba(6,13,26,.95);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(16px);
+  padding:0 32px;
+  display:flex;align-items:center;justify-content:space-between;
+  height:60px;
+}
+.logo-wrap{display:flex;align-items:center;gap:14px}
+.logo-icon{
+  width:36px;height:36px;border-radius:6px;
+  background:linear-gradient(135deg,var(--accent2),var(--accent));
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;box-shadow:var(--glow);
+  animation:logoPulse 3s ease-in-out infinite;
+}
+@keyframes logoPulse{0%,100%{box-shadow:0 0 12px rgba(0,212,255,.3)}50%{box-shadow:0 0 28px rgba(0,212,255,.6)}}
+.logo-text strong{
+  font-family:var(--head);font-size:14px;font-weight:700;
+  letter-spacing:.14em;color:#fff;text-transform:uppercase;
+}
+.logo-text span{
+  display:block;font-size:9px;color:var(--text2);
+  letter-spacing:.18em;font-family:var(--mono);text-transform:uppercase;margin-top:1px;
+}
+.header-right{display:flex;align-items:center;gap:10px}
+.status-pill{
+  font-family:var(--mono);font-size:10px;
+  border:1px solid;border-radius:20px;padding:3px 10px;letter-spacing:.08em;
+}
+.status-pill.standby{color:var(--warn);border-color:var(--warn);animation:blink 1.5s step-end infinite}
+.status-pill.online{color:var(--success);border-color:var(--success);animation:pulsePill 2.5s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes pulsePill{0%,100%{box-shadow:none}50%{box-shadow:0 0 10px rgba(0,229,160,.4)}}
+
+/* ── DEVICE BANNER ── */
+#deviceBanner{
+  position:relative;z-index:40;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:10px 32px;
+  display:none;
+  align-items:center;
+  gap:16px;
+  flex-wrap:wrap;
+}
+#deviceBanner.show{display:flex}
+.banner-label{
+  font-family:var(--mono);font-size:10px;color:var(--text2);
+  letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;
+}
+.device-cards{display:flex;gap:8px;flex-wrap:wrap}
+.device-card{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 14px;border-radius:var(--r);
+  border:1px solid var(--border2);
+  cursor:pointer;transition:all .25s;
+  background:var(--card);
+  position:relative;overflow:hidden;
+}
+.device-card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(0,212,255,.06),transparent);
+  opacity:0;transition:opacity .25s;
+}
+.device-card:hover::before{opacity:1}
+.device-card:hover{border-color:var(--accent2);transform:translateY(-1px)}
+.device-card.active{
+  border-color:var(--accent);
+  background:rgba(0,212,255,.08);
+  box-shadow:0 0 16px rgba(0,212,255,.2);
+}
+.device-card.active::before{opacity:1}
+.device-card.coming-soon{opacity:.45;cursor:not-allowed}
+.device-card.coming-soon:hover{transform:none;border-color:var(--border2)}
+.dc-icon{font-size:18px}
+.dc-info{display:flex;flex-direction:column}
+.dc-name{
+  font-family:var(--head);font-size:11px;font-weight:700;
+  letter-spacing:.1em;color:#fff;text-transform:uppercase;
+}
+.dc-sub{font-size:9px;color:var(--text2);font-family:var(--mono);letter-spacing:.08em}
+.dc-badge{
+  position:absolute;top:3px;right:5px;
+  font-size:8px;font-family:var(--mono);
+  color:var(--warn);letter-spacing:.06em;
+}
+.active-indicator{
+  position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+}
+
+/* ── APP WRAPPER ── */
+.app{
+  position:relative;z-index:1;
+  max-width:1100px;margin:0 auto;
+  padding:28px 20px 80px;
+}
+
+/* ── LOGIN ── */
+#loginContainer{
+  max-width:420px;margin:70px auto 0;
+  animation:fadeUp .5s ease;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.login-card{
+  background:var(--card);border:1px solid var(--border2);
+  border-radius:var(--r2);overflow:hidden;
+  box-shadow:0 0 60px rgba(0,212,255,.08),0 20px 60px rgba(0,0,0,.5);
+}
+.login-card::before{
+  content:'';display:block;height:3px;
+  background:linear-gradient(90deg,var(--accent2),var(--accent),var(--success));
+}
+.login-inner{padding:36px 36px 32px}
+.login-icon{font-size:40px;text-align:center;margin-bottom:16px}
+.login-title{
+  font-family:var(--head);font-size:18px;font-weight:700;
+  letter-spacing:.14em;color:#fff;text-align:center;
+  text-transform:uppercase;margin-bottom:4px;
+}
+.login-sub{text-align:center;font-size:12px;color:var(--text2);font-family:var(--mono);letter-spacing:.1em;margin-bottom:28px}
+.lfield{margin-bottom:16px}
+.lfield label{
+  display:block;font-size:10px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;
+  color:var(--text2);margin-bottom:6px;font-family:var(--mono);
+}
+.lfield input{
+  width:100%;padding:11px 14px;
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:var(--r);color:#fff;font-family:var(--mono);font-size:14px;
+  outline:none;transition:border-color .2s,box-shadow .2s;
+}
+.lfield input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.12)}
+.lfield input::placeholder{color:var(--muted)}
+.login-btn{
+  width:100%;padding:13px;margin-top:4px;
+  background:linear-gradient(135deg,var(--accent2),var(--accent));
+  color:#000;font-family:var(--head);font-size:13px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;border:none;
+  border-radius:var(--r);cursor:pointer;
+  transition:all .2s;box-shadow:0 4px 20px rgba(0,212,255,.35);
+}
+.login-btn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,212,255,.5)}
+#error-message{
+  color:var(--danger);font-size:12px;margin-top:10px;
+  text-align:center;min-height:18px;font-family:var(--mono);letter-spacing:.06em;
+}
+
+/* ── MAIN TABS ── */
+#ilsContainer{display:none}
+.tab-bar{
+  display:flex;gap:4px;flex-wrap:wrap;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r2);padding:6px;
+  margin-bottom:24px;
+  box-shadow:0 4px 24px rgba(0,0,0,.4);
+}
+.tablinks{
+  flex:1;min-width:130px;padding:9px 12px;
+  background:transparent;border:1px solid transparent;
+  border-radius:var(--r);cursor:pointer;
+  font-family:var(--body);font-size:12px;font-weight:600;
+  letter-spacing:.07em;color:var(--text2);text-transform:uppercase;
+  transition:all .2s;
+}
+.tablinks:hover{color:var(--text);background:var(--card)}
+.tablinks.active{
+  background:rgba(0,212,255,.1);
+  color:var(--accent);border-color:var(--accent);
+  box-shadow:0 0 14px rgba(0,212,255,.2);
+}
+.tablinks .tab-badge{
+  display:inline-block;font-size:8px;font-family:var(--mono);
+  color:var(--warn);margin-left:4px;vertical-align:middle;
+}
+
+/* device lock overlay */
+.device-locked{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:320px;gap:14px;
+  border:1px dashed var(--border2);border-radius:var(--r2);
+  color:var(--muted);
+}
+.device-locked .lock-icon{font-size:48px;opacity:.3}
+.device-locked p{font-family:var(--mono);font-size:13px;letter-spacing:.08em;text-align:center;line-height:1.6}
+.coming-soon-badge{
+  display:inline-block;padding:6px 16px;
+  border:1px solid var(--warn);border-radius:20px;
+  color:var(--warn);font-size:11px;font-family:var(--mono);letter-spacing:.1em;
+  margin-top:6px;
+}
+
+/* ── TAB CONTENT ── */
+.tabcontent{display:none;animation:fadeUp .3s ease}
+.tabcontent.active{display:block}
+
+/* ── SECTION CARD ── */
+.sec-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r2);margin-bottom:20px;overflow:hidden;
+  box-shadow:0 4px 24px rgba(0,0,0,.35);
+  transition:box-shadow .3s;
+}
+.sec-card:hover{box-shadow:0 4px 32px rgba(0,212,255,.08)}
+.sec-card-header{
+  background:linear-gradient(135deg,var(--card2),rgba(19,34,64,.5));
+  padding:14px 20px;
+  display:flex;align-items:center;gap:12px;
+  border-bottom:1px solid var(--border);
+}
+.sec-tag{
+  font-size:9px;font-family:var(--mono);color:var(--accent);
+  border:1px solid var(--accent3);border-radius:20px;
+  padding:2px 8px;letter-spacing:.1em;background:rgba(0,212,255,.06);
+  white-space:nowrap;
+}
+.sec-tag.device-tag{
+  color:var(--success);border-color:rgba(0,229,160,.3);
+  background:rgba(0,229,160,.06);font-size:9px;
+}
+.sec-card-header h3{
+  font-family:var(--head);font-size:13px;font-weight:700;
+  color:#fff;letter-spacing:.12em;text-transform:uppercase;
+}
+.sec-card-body{padding:22px 24px}
+
+.subsec{margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid var(--border)}
+.subsec:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none}
+.subsec-title{
+  font-family:var(--mono);font-size:10px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+  margin-bottom:14px;display:flex;align-items:center;gap:8px;
+}
+.subsec-title::before{
+  content:'';width:3px;height:14px;background:var(--accent);
+  border-radius:2px;display:inline-block;flex-shrink:0;
+}
+
+/* ── FORM ── */
+.field{margin-bottom:14px}
+.field label{
+  display:block;font-size:10px;font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text2);margin-bottom:6px;font-family:var(--mono);
+}
+.field input,.field select,
+input[type="number"],input[type="text"],select{
+  width:100%;padding:10px 13px;
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:var(--r);color:var(--text);
+  font-family:var(--mono);font-size:14px;outline:none;
+  transition:border-color .2s,box-shadow .2s;
+  -webkit-appearance:none;
+}
+input:focus,select:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(0,212,255,.1);
+}
+input::placeholder{color:var(--muted)}
+select{
+  cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M0 0l5 7 5-7z' fill='%233d6080'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;
+}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.f3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+
+/* ── BUTTONS ── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  background:linear-gradient(135deg,var(--accent2),var(--accent));
+  color:#000;font-family:var(--body);font-size:12px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;
+  border:none;border-radius:var(--r);padding:10px 20px;
+  cursor:pointer;transition:all .2s;
+  box-shadow:0 3px 14px rgba(0,212,255,.25);white-space:nowrap;
+}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(0,212,255,.4)}
+.btn:active{transform:translateY(0)}
+.btn-full{width:100%;margin-top:6px}
+.btn-success{
+  background:linear-gradient(135deg,#0b8060,var(--success));
+  box-shadow:0 3px 14px rgba(0,229,160,.2);color:#000;
+}
+.btn-neutral{
+  background:transparent;color:var(--text2);
+  border:1px solid var(--border2);box-shadow:none;
+}
+.btn-neutral:hover{background:var(--card2);color:var(--text);box-shadow:none}
+
+/* ── RESULT BOXES ── */
+.rbox{
+  margin-top:10px;padding:11px 15px;
+  background:var(--surface);border:1px solid var(--border);
+  border-left:2px solid var(--accent);border-radius:var(--r);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  font-family:var(--mono);min-height:42px;
+}
+.rbox .rl{font-size:10px;color:var(--text2);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.rbox .rv{color:var(--accent);font-weight:700;font-size:15px}
+.rbox.rs{border-left-color:var(--success)}.rbox.rs .rv{color:var(--success)}
+.rbox.rw{border-left-color:var(--warn)}.rbox.rw .rv{color:var(--warn)}
+.rbox.rd{border-left-color:var(--danger)}.rbox.rd .rv{color:var(--danger)}
+.rbox.rp{border-left-color:var(--purple)}.rbox.rp .rv{color:var(--purple)}
+
+/* info button */
+.ibtn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;border-radius:50%;
+  background:rgba(0,229,160,.15);color:var(--success);
+  font-size:11px;font-weight:700;cursor:pointer;
+  margin-left:6px;vertical-align:middle;
+  border:1px solid rgba(0,229,160,.25);transition:all .15s;
+}
+.ibtn:hover{background:rgba(0,229,160,.3);transform:scale(1.1)}
+
+/* ── POPUP MODAL ── */
+.popup-modal{
+  display:none;position:fixed;z-index:2000;inset:0;
+  background:rgba(0,0,0,.85);backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;
+}
+.popup-modal.open{display:flex}
+.popup-content{
+  background:var(--card);border:1px solid var(--border2);
+  border-radius:var(--r2);padding:28px 32px;
+  max-width:520px;width:90%;
+  box-shadow:0 0 60px rgba(0,212,255,.15),0 20px 60px rgba(0,0,0,.6);
+  position:relative;animation:fadeUp .25s ease;
+}
+.popup-content::before{
+  content:'';display:block;height:2px;margin:-28px -32px 20px;
+  background:linear-gradient(90deg,var(--accent2),var(--accent),var(--success));
+}
+.popup-content h5{
+  font-family:var(--head);font-size:13px;font-weight:700;
+  color:var(--accent);letter-spacing:.12em;text-transform:uppercase;
+  margin-bottom:14px;
+}
+.popup-content p{
+  font-family:var(--mono);font-size:13px;color:var(--text);
+  line-height:1.8;margin-bottom:6px;
+}
+.popup-close{
+  position:absolute;top:12px;right:14px;
+  background:none;border:none;color:var(--text2);
+  font-size:20px;cursor:pointer;padding:0;line-height:1;
+}
+.popup-close:hover{color:var(--danger)}
+
+/* ── TABLES ── */
+.twrap{overflow-x:auto;border-radius:var(--r);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{
+  background:rgba(0,212,255,.08);color:var(--accent);
+  padding:10px 12px;font-family:var(--mono);font-size:10px;
+  font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap;
+}
+td{
+  padding:9px 12px;border-bottom:1px solid rgba(26,48,85,.5);
+  color:var(--text);font-size:12px;line-height:1.5;vertical-align:top;
+}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(0,212,255,.03)}
+#resultTable th{background:rgba(0,229,160,.08);color:var(--success)}
+.arrow-down{color:var(--danger);font-size:18px;font-weight:700}
+.arrow-up{color:var(--success);font-size:18px;font-weight:700}
+
+/* ── CAT ROW ── */
+.cat-row{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin-bottom:14px;padding:10px 14px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);
+}
+.cat-row label{
+  font-size:10px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text2);white-space:nowrap;
+  font-family:var(--mono);
+}
+.cat-row select{width:auto;min-width:120px;padding:7px 10px;font-size:13px}
+
+/* ── RADIO ── */
+.radio-row{display:flex;gap:20px;flex-wrap:wrap;margin:12px 0}
+.radio-item{display:flex;align-items:center;gap:8px;cursor:pointer}
+.radio-item label{
+  font-size:13px;font-weight:500;color:var(--text);
+  cursor:pointer;margin:0;letter-spacing:normal;text-transform:none;
+}
+input[type="radio"]{
+  width:auto;cursor:pointer;accent-color:var(--accent);
+}
+
+/* ── ACTION ROW ── */
+.action-row{
+  display:flex;gap:10px;justify-content:flex-end;
+  margin-top:22px;padding-top:18px;border-top:1px solid var(--border);
+}
+
+/* ── FOOTER ── */
+footer{
+  position:fixed;bottom:14px;right:18px;z-index:100;
+  font-family:var(--mono);font-size:10px;color:var(--text2);
+  background:rgba(11,22,40,.9);border:1px solid var(--border);
+  border-radius:20px;padding:5px 13px;
+  backdrop-filter:blur(8px);
+}
+
+/* ── RESPONSIVE ── */
+@media(max-width:660px){
+  header{padding:0 14px}
+  #deviceBanner{padding:10px 14px}
+  .app{padding:16px 12px 80px}
+  .f2,.f3{grid-template-columns:1fr}
+  .sec-card-body{padding:16px 14px}
+  th,td{font-size:11px;padding:7px 8px}
+  .tablinks{min-width:100px;font-size:11px;padding:8px 8px}
+  .device-card{padding:6px 10px}
+  .dc-name{font-size:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="logo-wrap">
+    <div class="logo-icon">🛬</div>
+    <div class="logo-text">
+      <strong>ILS Calibration Suite</strong>
+      <span>RCDU · AAI · Multi-Device Platform</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill standby" id="statusPill">● STANDBY</div>
+  </div>
+</header>
+
+<!-- ══ DEVICE BANNER ══ -->
+<div id="deviceBanner">
+  <span class="banner-label">Active Device:</span>
+  <div class="device-cards" id="deviceCards">
+
+    <div class="device-card active" id="dc-rts" onclick="selectDevice('rts')">
+      <div class="dc-icon">📡</div>
+      <div class="dc-info">
+        <span class="dc-name">RTS</span>
+        <span class="dc-sub">ILS · Current</span>
+      </div>
+      <div class="active-indicator" id="di-rts"></div>
+    </div>
+
+    <div class="device-card coming-soon" id="dc-nm7000" onclick="selectDevice('nm7000')">
+      <div class="dc-icon">🔧</div>
+      <div class="dc-info">
+        <span class="dc-name">NM 7000</span>
+        <span class="dc-sub">ILS · NORMARC</span>
+      </div>
+      <span class="dc-badge">SOON</span>
+    </div>
+
+    <div class="device-card coming-soon" id="dc-shf" onclick="selectDevice('shf')">
+      <div class="dc-icon">⚙️</div>
+      <div class="dc-info">
+        <span class="dc-name">SHF 101/102</span>
+        <span class="dc-sub">ILS · SHF</span>
+      </div>
+      <span class="dc-badge">SOON</span>
+    </div>
+
+    <div class="device-card coming-soon" id="dc-nm7001" onclick="selectDevice('nm7001')">
+      <div class="dc-icon">🛰️</div>
+      <div class="dc-info">
+        <span class="dc-name">NORMARC 7001</span>
+        <span class="dc-sub">ILS · Next-Gen</span>
+      </div>
+      <span class="dc-badge">SOON</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div class="app">
+
+<!-- ────────── LOGIN ────────── -->
+<div id="loginContainer">
+  <div class="login-card">
+    <div class="login-inner">
+      <div class="login-icon">🔐</div>
+      <div class="login-title">Secure Access</div>
+      <div class="login-sub">ILS Calibration Suite · AAI · RCDU</div>
+      <div class="lfield">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Enter username"/>
+      </div>
+      <div class="lfield">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Enter password"/>
+      </div>
+      <button class="login-btn" onclick="validateLogin()">▶ Login</button>
+      <p id="error-message"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ────────── MAIN APP ────────── -->
+<div id="ilsContainer">
+
+  <div class="tab-bar">
+    <button class="tablinks" onclick="openTab('llz')">
+      📡 Localizer <span class="tab-badge" id="llz-device-badge"></span>
+    </button>
+    <button class="tablinks" onclick="openTab('gp')">
+      📐 Glide Path <span class="tab-badge" id="gp-device-badge"></span>
+    </button>
+    <button class="tablinks" onclick="openTab('general')">🔢 General Calculations</button>
+    <button class="tablinks" onclick="openTab('limits')">📋 ICAO Limits</button>
+  </div>
+
+  <!-- ══════════════════════════════
+       TAB: LLZ CALIBRATION
+  ══════════════════════════════ -->
+  <div id="llz" class="tabcontent">
+    <div id="llz-rts-content">
+
+      <!-- Course Width -->
+      <div class="sec-card">
+        <div class="sec-card-header">
+          <span class="sec-tag">LLZ</span>
+          <span class="sec-tag device-tag" id="llz-device-label">RTS</span>
+          <h3>Course Width Adjustments</h3>
+        </div>
+        <div class="sec-card-body">
+
+          <div class="subsec">
+            <div class="subsec-title">Course Width from Runway Length</div>
+            <div class="field">
+              <label>Runway Length + LLZ Setback (m)</label>
+              <input type="number" id="runwayLengthLLZ" placeholder="e.g. 3000"/>
+            </div>
+            <button class="btn btn-full" onclick="calculateCourseWidthLLZ()">Calculate Course Width</button>
+            <div class="rbox" style="margin-top:10px">
+              <span class="rl">Course Width:</span><span class="rv" id="outputCourseWidthLLZ">—</span>
+            </div>
+            <span class="ibtn" onclick="showPopup('formulaCourseWidth')">i</span>
+          </div>
+
+          <div class="subsec">
+            <div class="subsec-title">SBO Required Calculation</div>
+            <div class="f2">
+              <div class="field"><label>SBO Present (dBm)</label><input type="number" id="sboPresentLLZ" placeholder="dBm"/></div>
+              <div class="field"><label>Multiplier Factor</label><input type="number" id="mulFactorLLZ" placeholder="e.g. 20"/></div>
+            </div>
+            <div class="f2">
+              <div class="field"><label>Course Width Measured (°)</label><input type="number" id="widthMeasureLLZ" placeholder="°"/></div>
+              <div class="field"><label>Course Width Required (°)</label><input type="number" id="widthRequiredLLZ" placeholder="°"/></div>
+            </div>
+            <button class="btn btn-full" onclick="calculateSBORequiredLLZ()">Calculate SBO Required</button>
+            <div class="rbox" style="margin-top:10px">
+              <span class="rl">SBO Required:</span><span class="rv" id="outputSBORequiredLLZ">—</span>
+            </div>
+            <span class="ibtn" onclick="showPopup('formulaSBORequired')">i</span>
+          </div>
+
+          <div class="subsec">
+            <div class="subsec-title">Commissioned Course Width Limit</div>
+            <div class="f2">
+              <div class="field"><label>Commissioned Width (°)</label><input type="number" id="inputX" placeholder="°"/></div>
+              <div class="field"><label>Percentage Variability (%)</label><input type="number" id="inputY" placeholder="%"/></div>
+            </div>
+            <button class="btn btn-full" onclick="calculateValues()">Calculate Commissioned Limit</button>
+            <div class="rbox rs" style="margin-top:10px">
+              <span class="rl">Width Limit:</span><span class="rv" id="outputResult1">—</span>
+            </div>
+          </div>
+
+          <div class="subsec">
+            <div class="subsec-title">Assigned Course Width Limit</div>
+            <div class="f2">
+              <div class="field"><label>Assigned Width (°)</label><input type="number" id="inputP" placeholder="°"/></div>
+              <div class="field"><label>Percentage Variability (%)</label><input type="number" id="inputQ" placeholder="%"/></div>
+            </div>
+            <button class="btn btn-full" onclick="calculateValuesA()">Calculate Assigned Limit</button>
+            <div class="rbox rs" style="margin-top:10px">
+              <span class="rl">Assigned Limit:</span><span class="rv" id="outputValue1">—</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- LLZ Alarms -->
+      <div class="sec-card">
+        <div class="sec-card-header">
+          <span class="sec-tag">ALARM</span>
+          <span class="sec-tag device-tag" id="llz-alarm-label">RTS</span>
+          <h3>LLZ Alarm Settings</h3>
+        </div>
+        <div class="sec-card-body">
+
+          <div class="subsec">
+            <div class="subsec-title">Course Width Alarm — Narrow / Wide</div>
+            <div class="field"><label>SBO Power (dBm)</label><input type="number" id="sbo" placeholder="Present SBO dBm"/></div>
+            <div class="f2">
+              <div>
+                <div class="field"><label>Narrow Alarm %</label><input type="number" id="alarmPercentageLLZN" placeholder="%"/></div>
+                <button class="btn btn-full" style="font-size:11px" onclick="calculateAlarmLLZN()">Calculate Narrow</button>
+                <div class="rbox rw" style="margin-top:8px">
+                  <span class="rl">Narrow SBO:</span><span class="rv" id="outputNarrowValue">—</span>
+                </div>
+                <span class="ibtn" onclick="showPopup('formulaSBONarrow')">i</span>
+              </div>
+              <div>
+                <div class="field"><label>Wide Alarm %</label><input type="number" id="alarmPercentageLLZW" placeholder="%"/></div>
+                <button class="btn btn-full" style="font-size:11px" onclick="calculateAlarmLLZW()">Calculate Wide</button>
+                <div class="rbox rw" style="margin-top:8px">
+                  <span class="rl">Wide SBO:</span><span class="rv" id="outputWideValue">—</span>
+                </div>
+                <span class="ibtn" onclick="showPopup('formulaSBOWide')">i</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="subsec">
+            <div class="subsec-title">Position Alarm</div>
+            <div class="cat-row">
+              <label>Category:</label>
+              <select id="categorySelect" onchange="filterCategory()">
+                <option value="cat1">CAT-I</option>
+                <option value="cat2">CAT-II</option>
+                <option value="cat3">CAT-III</option>
+              </select>
+            </div>
+            <div class="twrap">
+              <table><thead><tr><th>Limits</th><th>Category</th><th>ICAO</th><th>Alarm</th><th>AAI</th></tr></thead>
+              <tbody id="limitsTableBody"></tbody></table>
+            </div>
+          </div>
+
+          <div class="subsec">
+            <div class="subsec-title">Clearance Current Alarm</div>
+            <div class="f2">
+              <div class="field"><label>Present Clearance Power (dBm)</label><input type="number" id="presentClearancePowerDBM" placeholder="dBm"/></div>
+              <div class="field"><label>Min Clearance Current (MKA)</label><input type="number" id="minClearanceCurrentMKA" placeholder="MKA"/></div>
+            </div>
+            <button class="btn btn-full" onclick="calculateClearanceCurrent()">Calculate Clearance Current for Alarm</button>
+            <div class="rbox rs" style="margin-top:10px">
+              <span class="rl">Clearance Current for Alarm:</span><span class="rv" id="outputClearanceValue">—</span>
+            </div>
+            <span class="ibtn" onclick="showPopup('formulaclearancecurrentoutput')">i</span>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn btn-neutral" onclick="resetValues()">↺ Reset All</button>
+        <button class="btn btn-success" onclick="printPage()">🖨 Print</button>
+      </div>
+
+    </div><!-- /llz-rts-content -->
+
+    <!-- Coming Soon overlay for other devices -->
+    <div id="llz-coming-soon" style="display:none">
+      <div class="device-locked">
+        <div class="lock-icon">🔧</div>
+        <p>LLZ Calibration for<br><strong id="llz-cs-name" style="color:var(--accent)">—</strong><br>is not yet available.</p>
+        <span class="coming-soon-badge">COMING SOON</span>
+        <p style="margin-top:10px;font-size:11px;color:var(--muted)">General Calculations & ICAO Limits tabs are device-independent and fully available.</p>
+      </div>
+    </div>
+  </div><!-- /llz tab -->
+
+  <!-- ══════════════════════════════
+       TAB: GP CALIBRATION
+  ══════════════════════════════ -->
+  <div id="gp" class="tabcontent">
+    <div id="gp-rts-content">
+
+      <!-- Antenna Height -->
+      <div class="sec-card">
+        <div class="sec-card-header">
+          <span class="sec-tag">GP</span>
+          <span class="sec-tag device-tag" id="gp-device-label">RTS</span>
+          <h3>Antenna Height Calculator</h3>
+        </div>
+        <div class="sec-card-body">
+          <div class="f2">
+            <div class="field"><label>Assigned Angle (default 3°)</label><input type="number" id="angleAssign" value="3" step="0.01" placeholder="3"/></div>
+            <div class="field"><label>Found Angle (°)</label><input type="number" id="angleFound" step="0.01" placeholder="e.g. 2.98"/></div>
+          </div>
+          <div class="radio-row">
+            <div class="radio-item">
+              <input type="radio" name="courseType" id="symmetric" value="symmetric" checked/>
+              <label for="symmetric">Symmetric Course Width</label>
+            </div>
+            <div class="radio-item">
+              <input type="radio" name="courseType" id="asymmetric" value="asymmetric"/>
+              <label for="asymmetric">Asymmetric Course Width</label>
+            </div>
+          </div>
+          <button class="btn btn-full" onclick="calculate()">Calculate Antenna Heights</button>
+          <div class="twrap" style="margin-top:14px">
+            <table id="resultTable">
+              <thead><tr><th>Antenna</th><th>Height (cm)</th><th>Slots</th></tr></thead>
+              <tbody>
+                <tr><td>Upper Antenna (A3)</td><td id="a3-height">—</td><td id="a3-slot">—</td></tr>
+                <tr><td>Middle Antenna (A2)</td><td id="a2-height">—</td><td id="a2-slot">—</td></tr>
+                <tr><td>Lower Antenna (A1)</td><td id="a1-height">—</td><td id="a1-slot">—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- GP Course Width -->
+      <div class="sec-card">
+        <div class="sec-card-header">
+          <span class="sec-tag">GP</span>
+          <span class="sec-tag device-tag" id="gp-cw-label">RTS</span>
+          <h3>Course Width Adjustments</h3>
+        </div>
+        <div class="sec-card-body">
+          <div class="f3">
+            <div class="field"><label>Middle Antenna DDM (with sign)</label><input type="number" id="middleAntennaDDM" placeholder="e.g. −0.8"/></div>
+            <div class="field"><label>Width Measured</label><input type="number" id="widthMeasureGP" placeholder="measured"/></div>
+            <div class="field"><label>Width Required</label><input type="number" id="widthRequiredGP" placeholder="required"/></div>
+          </div>
+          <button class="btn btn-full" onclick="calculateDDMsGP()">Calculate DDMs for Antennas</button>
+          <div class="f2" style="margin-top:12px">
+            <div class="rbox"><span class="rl">Lower A1 DDM:</span><span class="rv" id="outputLowerDDM">—</span></div>
+            <div class="rbox"><span class="rl">Middle A2 DDM:</span><span class="rv" id="outputMiddleDDM">—</span></div>
+            <div class="rbox"><span class="rl">Upper A3 — 90 Hz:</span><span class="rv" id="outputUpperDDM90">—</span></div>
+            <div class="rbox"><span class="rl">Upper A3 — 150 Hz:</span><span class="rv" id="outputUpperDDM150">—</span></div>
+          </div>
+          <span class="ibtn" onclick="showPopup('formulaMiddleAntenna')">i</span>
+        </div>
+      </div>
+
+      <!-- GP Alarms -->
+      <div class="sec-card">
+        <div class="sec-card-header">
+          <span class="sec-tag">ALARM</span>
+          <span class="sec-tag device-tag" id="gp-alarm-label">RTS</span>
+          <h3>GP Alarm Settings</h3>
+        </div>
+        <div class="sec-card-body">
+
+          <div class="subsec">
+            <div class="subsec-title">Course Width Alarm</div>
+            <div class="f2">
+              <div class="field"><label>Middle Antenna DDM (with sign)</label><input type="number" id="ddm" placeholder="e.g. −0.8"/></div>
+              <div class="field"><label>Alarm Percentage (%)</label><input type="number" id="alarmPercentageGP" placeholder="%"/></div>
+            </div>
+            <button class="btn btn-full" onclick="calculateAlarmGP()">Calculate GP Alarm</button>
+            <div class="f2" style="margin-top:12px">
+              <div class="rbox rw"><span class="rl">Lower A1:</span><span class="rv" id="outputLowerAlarm">—</span></div>
+              <div class="rbox rw"><span class="rl">Middle A2:</span><span class="rv" id="outputMiddleAlarm">—</span></div>
+              <div class="rbox rw"><span class="rl">Upper A3 — 90 Hz:</span><span class="rv" id="outputUpperAlarm90">—</span></div>
+              <div class="rbox rw"><span class="rl">Upper A3 — 150 Hz:</span><span class="rv" id="outputUpperAlarm150">—</span></div>
+            </div>
+            <span class="ibtn" onclick="showPopup('formulaGPNarrowAlarm')">i</span>
+          </div>
+
+          <div class="subsec">
+            <div class="subsec-title">Glide Angle Alarm</div>
+            <div class="cat-row">
+              <label>Category:</label>
+              <select id="categorySelectGP" onchange="filterCategoryGP()">
+                <option value="cat1">CAT-I</option>
+                <option value="cat2">CAT-II</option>
+                <option value="cat3">CAT-III</option>
+              </select>
+            </div>
+            <div class="twrap">
+              <table><thead><tr><th>Limits</th><th>Category</th><th>ICAO</th><th>Alarm</th><th>AAI</th></tr></thead>
+              <tbody id="limitsTableBodyGP"></tbody></table>
+            </div>
+          </div>
+
+          <div class="subsec">
+            <div class="subsec-title">Clearance Current Alarm (A1 &amp; A3)</div>
+            <div class="rbox rs">
+              <span class="rl">Fixed Clearance Current:</span>
+              <span class="rv">190 MKA</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn btn-neutral" onclick="resetValues()">↺ Reset All</button>
+        <button class="btn btn-success" onclick="printPage()">🖨 Print</button>
+      </div>
+
+    </div><!-- /gp-rts-content -->
+
+    <div id="gp-coming-soon" style="display:none">
+      <div class="device-locked">
+        <div class="lock-icon">🔧</div>
+        <p>GP Calibration for<br><strong id="gp-cs-name" style="color:var(--accent)">—</strong><br>is not yet available.</p>
+        <span class="coming-soon-badge">COMING SOON</span>
+        <p style="margin-top:10px;font-size:11px;color:var(--muted)">General Calculations & ICAO Limits tabs are device-independent and fully available.</p>
+      </div>
+    </div>
+  </div><!-- /gp tab -->
+
+  <!-- ══════════════════════════════
+       TAB: GENERAL (DEVICE-INDEPENDENT)
+  ══════════════════════════════ -->
+  <div id="general" class="tabcontent">
+
+    <div class="sec-card">
+      <div class="sec-card-header">
+        <span class="sec-tag">LLZ</span>
+        <span class="sec-tag" style="color:var(--text2);border-color:var(--border2);background:rgba(255,255,255,.03)">Device Independent</span>
+        <h3>General Calculations — Localizer</h3>
+      </div>
+      <div class="sec-card-body">
+
+        <div class="subsec">
+          <div class="subsec-title">Power Conversion (dBm → mW / W)</div>
+          <div class="field"><label>Input Power (dBm)</label><input type="number" id="powerInputLLZ" placeholder="e.g. −20"/></div>
+          <button class="btn btn-full" onclick="convertPowerLLZ()">Convert Power</button>
+          <div class="rbox" style="margin-top:10px">
+            <span class="rl">Power:</span><span class="rv" id="outputPowerLLZ">—</span>
+          </div>
+          <span class="ibtn" onclick="showPopup('formulaPower')">i</span>
+        </div>
+
+        <div class="subsec">
+          <div class="subsec-title">Distance → DDM %</div>
+          <div class="field"><label>Distance (metres)</label><input type="number" id="distanceLLZ" placeholder="e.g. 75"/></div>
+          <button class="btn btn-full" onclick="convertDistanceLLZ()">Convert to DDM %</button>
+          <div class="rbox" style="margin-top:10px">
+            <span class="rl">DDM %:</span><span class="rv" id="outputDDMLLZ">—</span>
+          </div>
+          <span class="ibtn" onclick="showPopup('formulaDDM')">i</span>
+        </div>
+
+        <div class="subsec">
+          <div class="subsec-title">DDM % → Current (MKA)</div>
+          <div class="field"><label>DDM %</label><input type="number" id="distanceCurrentLLZ" placeholder="e.g. 10.8"/></div>
+          <button class="btn btn-full" onclick="calculateCurrentLLZ()">Calculate Current</button>
+          <div class="rbox rs" style="margin-top:10px">
+            <span class="rl">Current:</span><span class="rv" id="outputCurrentLLZ">—</span>
+          </div>
+          <span class="ibtn" onclick="showPopup('formulaCurrent')">i</span>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="sec-card">
+      <div class="sec-card-header">
+        <span class="sec-tag">GP</span>
+        <span class="sec-tag" style="color:var(--text2);border-color:var(--border2);background:rgba(255,255,255,.03)">Device Independent</span>
+        <h3>General Calculations — Glide Path</h3>
+      </div>
+      <div class="sec-card-body">
+
+        <div class="subsec">
+          <div class="subsec-title">Angle → DDM % and Current</div>
+          <div class="f2">
+            <div class="field"><label>Assigned Angle (default 3°)</label><input type="number" id="angleAssignGP" placeholder="3"/></div>
+            <div class="field"><label>Entered Angle (°)</label><input type="number" id="angleEnterGP" placeholder="e.g. 2.95"/></div>
+          </div>
+          <button class="btn btn-full" onclick="calculateDDMandCurrentGP()">Calculate DDM % and Current</button>
+          <div class="f2" style="margin-top:10px">
+            <div class="rbox"><span class="rl">DDM %:</span><span class="rv" id="outputDDMGP">—</span></div>
+            <div class="rbox rs"><span class="rl">Current:</span><span class="rv" id="outputCurrentGP">—</span></div>
+          </div>
+          <span class="ibtn" onclick="showPopup('formulaDDMGP')">i</span>
+        </div>
+
+        <div class="subsec">
+          <div class="subsec-title">GP Sector Width</div>
+          <div class="field"><label>Commissioned Angle (default 3°)</label><input type="number" id="anglecommGP" placeholder="3"/></div>
+          <button class="btn btn-full" onclick="calculatesectorwidthGP()">Calculate Sector Width</button>
+          <div class="rbox" style="margin-top:10px">
+            <span class="rl">Sector Width:</span><span class="rv" id="sectorwidthGP">—</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /general -->
+
+  <!-- ══════════════════════════════
+       TAB: ICAO LIMITS (DEVICE-INDEPENDENT)
+  ══════════════════════════════ -->
+  <div id="limits" class="tabcontent">
+    <div class="sec-card">
+      <div class="sec-card-header">
+        <span class="sec-tag">ICAO</span>
+        <span class="sec-tag" style="color:var(--text2);border-color:var(--border2);background:rgba(255,255,255,.03)">Device Independent</span>
+        <h3>ILS ICAO Limits</h3>
+      </div>
+      <div class="sec-card-body">
+        <div class="cat-row">
+          <label>Select Category:</label>
+          <select id="categorySelectLimits" onchange="filterCategoryLimits()">
+            <option value="cat1">CAT-I</option>
+            <option value="cat2">CAT-II</option>
+            <option value="cat3">CAT-III</option>
+          </select>
+        </div>
+        <div class="subsec">
+          <div class="subsec-title">Localizer (LLZ)</div>
+          <div class="twrap">
+            <table><thead><tr><th>Parameter</th><th>ICAO Limit</th><th>Alarm</th><th>Remarks</th></tr></thead>
+            <tbody id="llzLimitsTableBodyLimits"></tbody></table>
+          </div>
+        </div>
+        <div class="subsec">
+          <div class="subsec-title">Glide Path (GP)</div>
+          <div class="twrap">
+            <table><thead><tr><th>Parameter</th><th>ICAO Limit</th><th>Alarm</th><th>Remarks</th></tr></thead>
+            <tbody id="gpLimitsTableBodyLimits"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /limits -->
+
+</div><!-- /ilsContainer -->
+</div><!-- /app -->
+
+<!-- FOOTER -->
+<footer>By: Ayush Kaushik · A.M (CNS) · RCDU · AAI</footer>
+
+<!-- ══════════════════════════════
+     POPUPS
+══════════════════════════════ -->
+<div id="formulaPower" class="popup-modal"><div class="popup-content"><button class="popup-close" onclick="hidePopup('formulaPower')">&times;</button><h5>Power Conversion</h5><p>Power (mW) = 10 ^ (dBm / 10)</p><p>Power (W) = mW / 1000</p></div></div>
+<div id="formulaCourseWidth" class="popup-modal"><div class="popup-content"><button class="popup-close" onclick="hidePopup('formulaCourseWidth')">&times;</button><h5>Course Width</h5><p>Course Width = 2 × tan⁻¹(106.68 / Runway Length)</p></div></div>
+<div id="formulaDDM" class="popup-modal"><div class="popup-content"><button class="popup-close" onclick="hidePopup('formulaDDM')">&times;</button><h5>Distance → DDM</h5><p>DDM % = 0.145 × Distance (m)</p></div></div>
+<div id="formulaCurrent" class="popup-modal"><div class="popup-content"><button class="popup-close" onclick="hidePopup('formulaCurrent')">&times;</button><h5>DDM → Current</h5><p>Current (µA) = (150 / 15.5) × DDM %</p></div></div>
+<div id="formulaSBORequired" class="popup-modal"><div class="popup-content"><button class="popup-close" onclick="hidePopup('formulaSBORequired')">&times;</button><h5>SBO Required</h5><p>SBO Req = SBO Present + Mul.Factor × log₁₀(W_measured / W_required)</p></div></div>
+<div id="formulaSBONarrow" class="popup-modal"><div class="popup-content"><button class="popup-close" onclick="hidePopup('formulaSBONarrow')">&times;</button><h5>SBO Narrow Alarm</h5><p>SBO Narrow = 20 × log₁₀(1 / (1 − Alarm% / 100)) + SBO Present</p></div></div>
+<div id="formulaSBOWide" class="popup-modal"><div class="popup-content"><button class="popup-close" onclick="hidePopup('formulaSBOWide')">&times;</button><h5>SBO Wide Alarm</h5><p>SBO Wide = 20 × log₁₀(1 / (1 + Alarm% / 100)) + SBO Present</p></div></div>
+<div id="formulaDDMGP" class="popup-modal"><div class="popup-content"><button class="popup-close" onclick="hidePopup('formulaDDMGP')">&times;</button><h5>GP DDM & Current</h5><p>DDM % = (8.75 / 0.36) × (Angle Assigned − Angle Entered)</p><p>Current (µA) = (75 / 8.75) × DDM %</p></div></div>
+<div id="formulaMiddleAntenna" class="popup-modal"><div class="popup-content"><button class="popup-close" onclick="hidePopup('formulaMiddleAntenna')">&times;</button><h5>Antenna DDM Formulas</h5><p>Lower A1 = (W_m / W_r × M_DDM) × 0.25</p><p>Middle A2 = (W_m / W_r) × M_DDM</p><p>Upper A3 90/150 = (W_m / W_r × M_DDM) × 0.00125</p></div></div>
+<div id="formulaGPNarrowAlarm" class="popup-modal"><div class="popup-content"><button class="popup-close" onclick="hidePopup('formulaGPNarrowAlarm')">&times;</button><h5>GP Alarm Formulas</h5><p>Narrow A2 = M_DDM / (1 − 0.01 × Alarm %)</p><p>Wide A2 = M_DDM / (1 + 0.01 × Alarm %)</p></div></div>
+<div id="formulaclearancecurrentoutput" class="popup-modal"><div class="popup-content"><button class="popup-close" onclick="hidePopup('formulaclearancecurrentoutput')">&times;</button><h5>Clearance Current</h5><p>Clearance = Present Power + 20 × log₁₀(160 / Min Current MKA)</p></div></div>
+
+<script>
+/* ══════════════════════════════════════════
+   DEVICE CONFIG — Add new devices here
+   Each device needs: name, llz, gp objects
+   Set available:false for coming-soon devices
+══════════════════════════════════════════ */
+const DEVICES = {
+  rts: {
+    id: 'rts',
+    name: 'RTS',
+    fullName: 'RTS ILS System',
+    available: true,
+    llz: {
+      courseWidthConstant: 106.68,   // used in atan formula
+      sboMulDefault: 20,
+      narrowAlarmFormula: 'standard', // 20*log10(1/(1-a/100)) + SBO
+      wideAlarmFormula: 'standard',
+      clearanceRef: 160,
+    },
+    gp: {
+      ddmConstant: 8.75 / 0.36,      // multiplier for angle diff
+      currentConstant: 75 / 8.75,
+      antennaHeightFactor: 5 / 0.02,
+      antennaSlotFactor: 2 / 0.02,
+      lowerDDMFactor: 0.25,
+      upperDDMFactor: 0.00125,
+      clearanceCurrentFixed: 190,    // MKA — fixed value
+    }
+  },
+  nm7000: { id:'nm7000', name:'NM 7000', fullName:'NORMARC NM 7000', available: false },
+  shf:    { id:'shf',    name:'SHF 101/102', fullName:'SHF 101/102 ILS', available: false },
+  nm7001: { id:'nm7001', name:'NORMARC 7001', fullName:'NORMARC 7001', available: false },
+};
+
+let activeDevice = 'rts';
+
+/* ── DEVICE SELECTOR ── */
+function selectDevice(id) {
+  const dev = DEVICES[id];
+  if (!dev.available) return; // coming soon — do nothing
+  activeDevice = id;
+
+  // update card states
+  document.querySelectorAll('.device-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('dc-' + id).classList.add('active');
+
+  // update device labels in tabs
+  const label = dev.name;
+  ['llz-device-label','llz-alarm-label','gp-device-label','gp-cw-label','gp-alarm-label'].forEach(el => {
+    const e = document.getElementById(el);
+    if (e) e.textContent = label;
+  });
+  ['llz-device-badge','gp-device-badge'].forEach(el => {
+    const e = document.getElementById(el);
+    if (e) e.textContent = '· ' + label;
+  });
+
+  // show/hide LLZ content
+  document.getElementById('llz-rts-content').style.display = dev.available ? 'block' : 'none';
+  const llzCS = document.getElementById('llz-coming-soon');
+  llzCS.style.display = dev.available ? 'none' : 'flex';
+  if (!dev.available) document.getElementById('llz-cs-name').textContent = dev.fullName;
+
+  // show/hide GP content
+  document.getElementById('gp-rts-content').style.display = dev.available ? 'block' : 'none';
+  const gpCS = document.getElementById('gp-coming-soon');
+  gpCS.style.display = dev.available ? 'none' : 'flex';
+  if (!dev.available) document.getElementById('gp-cs-name').textContent = dev.fullName;
+}
+
+/* ── LOGIN ── */
+function validateLogin() {
+  const u = document.getElementById("username").value;
+  const p = document.getElementById("password").value;
+  if (u === "" && p === "") {
+    document.getElementById("loginContainer").style.display = "none";
+    document.getElementById("ilsContainer").style.display = "block";
+    document.getElementById("deviceBanner").classList.add('show');
+    const sp = document.getElementById("statusPill");
+    sp.textContent = "● ONLINE"; sp.className = 'status-pill online';
+    openTab('llz');
+    filterCategory(); filterCategoryGP(); filterCategoryLimits();
+  } else {
+    document.getElementById("error-message").textContent = "Invalid Username or Password!";
+  }
+}
+
+/* ── TABS ── */
+function openTab(name) {
+  document.querySelectorAll('.tabcontent').forEach(t => { t.classList.remove('active'); t.style.display = 'none'; });
+  document.querySelectorAll('.tablinks').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById(name);
+  if (el) { el.style.display = 'block'; setTimeout(() => el.classList.add('active'), 10); }
+  document.querySelectorAll('.tablinks').forEach(b => {
+    if (b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + name + "'")) b.classList.add('active');
+  });
+}
+
+/* ── POPUPS ── */
+function showPopup(id) { document.getElementById(id).classList.add('open'); }
+function hidePopup(id) { document.getElementById(id).classList.remove('open'); }
+window.addEventListener('click', e => {
+  document.querySelectorAll('.popup-modal.open').forEach(m => { if (e.target === m) m.classList.remove('open'); });
+});
+
+/* ══════════════════════════════
+   CALCULATIONS — all use DEVICES config
+   so upgrading to multi-device = edit config only
+══════════════════════════════ */
+
+/* LLZ GENERAL */
+function convertPowerLLZ() {
+  let v = parseFloat(document.getElementById("powerInputLLZ").value);
+  const o = document.getElementById("outputPowerLLZ");
+  if (!isNaN(v)) { let mw = Math.pow(10, v / 10); o.textContent = `${mw.toFixed(4)} mW  /  ${(mw / 1000).toFixed(6)} W`; }
+  else o.textContent = "Invalid input";
+}
+function convertDistanceLLZ() {
+  let d = parseFloat(document.getElementById("distanceLLZ").value);
+  const o = document.getElementById("outputDDMLLZ");
+  (!isNaN(d) && d >= 0) ? o.textContent = `${(0.145 * d).toFixed(2)}%` : o.textContent = "Invalid input";
+}
+function calculateCurrentLLZ() {
+  let d = parseFloat(document.getElementById("distanceCurrentLLZ").value);
+  const o = document.getElementById("outputCurrentLLZ");
+  (!isNaN(d) && d >= 0) ? o.textContent = `${((150 / 15.5) * d).toFixed(2)} µA` : o.textContent = "Invalid input";
+}
+
+/* LLZ CALIBRATION */
+function calculateCourseWidthLLZ() {
+  const cfg = DEVICES[activeDevice].llz;
+  let y = parseFloat(document.getElementById("runwayLengthLLZ").value);
+  const o = document.getElementById("outputCourseWidthLLZ");
+  (y > 0) ? o.textContent = `${(2 * Math.atan(cfg.courseWidthConstant / y) * (180 / Math.PI)).toFixed(4)}°` : o.textContent = "Invalid input";
+}
+function calculateSBORequiredLLZ() {
+  let s = parseFloat(document.getElementById("sboPresentLLZ").value);
+  let wm = parseFloat(document.getElementById("widthMeasureLLZ").value);
+  let wr = parseFloat(document.getElementById("widthRequiredLLZ").value);
+  let m = parseFloat(document.getElementById("mulFactorLLZ").value);
+  const o = document.getElementById("outputSBORequiredLLZ");
+  (!isNaN(s) && !isNaN(wm) && !isNaN(wr) && wr > 0) ? o.textContent = `${(s + m * Math.log10(wm / wr)).toFixed(2)} dBm` : o.textContent = "Invalid input";
+}
+function calculateAlarmLLZN() {
+  let a = parseFloat(document.getElementById("alarmPercentageLLZN").value);
+  let s = parseFloat(document.getElementById("sbo").value);
+  const o = document.getElementById("outputNarrowValue");
+  (!isNaN(a) && !isNaN(s)) ? o.textContent = `${(20 * Math.log10(1 / (1 - a / 100)) + s).toFixed(2)} dBm` : o.textContent = "Invalid input";
+}
+function calculateAlarmLLZW() {
+  let a = parseFloat(document.getElementById("alarmPercentageLLZW").value);
+  let s = parseFloat(document.getElementById("sbo").value);
+  const o = document.getElementById("outputWideValue");
+  (!isNaN(a) && !isNaN(s)) ? o.textContent = `${(20 * Math.log10(1 / (1 + a / 100)) + s).toFixed(2)} dBm` : o.textContent = "Invalid input";
+}
+function calculateValues() {
+  let x = parseFloat(document.getElementById("inputX").value);
+  let y = parseFloat(document.getElementById("inputY").value);
+  const o = document.getElementById('outputResult1');
+  (!isNaN(x) && !isNaN(y)) ? o.textContent = `${(x / (1 + 0.01 * y)).toFixed(2)}°  to  ${(x / (1 - 0.01 * y)).toFixed(2)}°` : o.textContent = "Invalid input";
+}
+function calculateValuesA() {
+  let p = parseFloat(document.getElementById("inputP").value);
+  let q = parseFloat(document.getElementById("inputQ").value);
+  const o = document.getElementById('outputValue1');
+  (!isNaN(p) && !isNaN(q)) ? o.textContent = `${(p * (1 - 0.01 * q)).toFixed(2)}°  to  ${(p * (1 + 0.01 * q)).toFixed(2)}°` : o.textContent = "Invalid input";
+}
+function calculateClearanceCurrent() {
+  const cfg = DEVICES[activeDevice].llz;
+  let mc = parseFloat(document.getElementById("minClearanceCurrentMKA").value);
+  let pp = parseFloat(document.getElementById("presentClearancePowerDBM").value);
+  const o = document.getElementById("outputClearanceValue");
+  (isNaN(mc) || isNaN(pp)) ? o.textContent = "Invalid input" : o.textContent = `${(pp + 20 * Math.log10(cfg.clearanceRef / mc)).toFixed(2)} dBm`;
+}
+
+/* GP GENERAL */
+function calculateDDMandCurrentGP() {
+  const cfg = DEVICES['rts'].gp; // general tab always uses base constants
+  let aa = parseFloat(document.getElementById("angleAssignGP").value) || 3.0;
+  let ae = parseFloat(document.getElementById("angleEnterGP").value);
+  if (!isNaN(ae)) {
+    let ddm = cfg.ddmConstant * (aa - ae);
+    let cur = cfg.currentConstant * ddm;
+    document.getElementById("outputDDMGP").textContent = ddm.toFixed(2);
+    document.getElementById("outputCurrentGP").textContent = `${cur.toFixed(2)} µA`;
+  } else {
+    document.getElementById("outputDDMGP").textContent = "Invalid input";
+    document.getElementById("outputCurrentGP").textContent = "Invalid input";
+  }
+}
+function calculatesectorwidthGP() {
+  let a = parseFloat(document.getElementById("anglecommGP").value) || 3.0;
+  document.getElementById("sectorwidthGP").textContent = !isNaN(a) ? (0.24 * a).toFixed(2) : "Invalid input";
+}
+
+/* GP CALIBRATION */
+function calculate() {
+  const cfg = DEVICES[activeDevice].gp;
+  let aa = parseFloat(document.getElementById('angleAssign').value);
+  let af = parseFloat(document.getElementById('angleFound').value);
+  let x = aa - af;
+  if (Math.round(x * 100) % 2 !== 0) x = x >= 0 ? x - 0.01 : x + 0.01;
+  let ax = Math.abs(x);
+  let arrow = x >= 0 ? "↓" : "↑", arrowClass = x >= 0 ? "arrow-down" : "arrow-up";
+  let sym = document.getElementById('symmetric').checked;
+  let hA2 = cfg.antennaHeightFactor * ax, sA2 = cfg.antennaSlotFactor * ax;
+  let hA1 = sym ? hA2 * 0.5 : hA2, sA1 = sym ? sA2 * 0.5 : sA2;
+  let hA3 = sym ? hA2 * 1.5 : hA2, sA3 = sym ? sA2 * 1.5 : sA2;
+  const fmt = (v, u, a, ac) => `${v.toFixed(2)} ${u} <span class="${ac}">${a}</span>`;
+  document.getElementById('a2-height').innerHTML = fmt(hA2, 'cm', arrow, arrowClass);
+  document.getElementById('a2-slot').innerHTML = fmt(sA2, 'slots', arrow, arrowClass);
+  document.getElementById('a1-height').innerHTML = fmt(hA1, 'cm', arrow, arrowClass);
+  document.getElementById('a1-slot').innerHTML = fmt(sA1, 'slots', arrow, arrowClass);
+  document.getElementById('a3-height').innerHTML = fmt(hA3, 'cm', arrow, arrowClass);
+  document.getElementById('a3-slot').innerHTML = fmt(sA3, 'slots', arrow, arrowClass);
+}
+function calculateDDMsGP() {
+  const cfg = DEVICES[activeDevice].gp;
+  let md = parseFloat(document.getElementById("middleAntennaDDM").value);
+  let wm = parseFloat(document.getElementById("widthMeasureGP").value);
+  let wr = parseFloat(document.getElementById("widthRequiredGP").value);
+  if (!isNaN(md) && !isNaN(wm) && !isNaN(wr) && wr > 0) {
+    let lo = ((wm / wr) * md) * cfg.lowerDDMFactor;
+    let mi = (wm / wr) * md;
+    let u150 = ((wm / wr) * md) * cfg.upperDDMFactor;
+    let u90 = -1 * u150;
+    document.getElementById("outputLowerDDM").textContent = lo.toFixed(2);
+    document.getElementById("outputMiddleDDM").textContent = mi.toFixed(2);
+    document.getElementById("outputUpperDDM90").textContent = u90.toFixed(4);
+    document.getElementById("outputUpperDDM150").textContent = u150.toFixed(4);
+  } else {
+    ["outputLowerDDM","outputMiddleDDM","outputUpperDDM90","outputUpperDDM150"].forEach(id => document.getElementById(id).textContent = "Invalid input");
+  }
+}
+function calculateAlarmGP() {
+  const cfg = DEVICES[activeDevice].gp;
+  let ap = parseFloat(document.getElementById("alarmPercentageGP").value);
+  let mc = parseFloat(document.getElementById("ddm").value);
+  if (!isNaN(ap) && !isNaN(mc)) {
+    let mN = mc / (1 - 0.01 * ap), mW = mc / (1 + 0.01 * ap);
+    document.getElementById("outputLowerAlarm").textContent = `N: ${(mN * cfg.lowerDDMFactor).toFixed(2)}  |  W: ${(mW * cfg.lowerDDMFactor).toFixed(2)}`;
+    document.getElementById("outputMiddleAlarm").textContent = `N: ${mN.toFixed(2)}  |  W: ${mW.toFixed(2)}`;
+    document.getElementById("outputUpperAlarm90").textContent = `N: ${(-mN * cfg.upperDDMFactor).toFixed(4)}  |  W: ${(-mW * cfg.upperDDMFactor).toFixed(4)}`;
+    document.getElementById("outputUpperAlarm150").textContent = `N: ${(mN * cfg.upperDDMFactor).toFixed(4)}  |  W: ${(mW * cfg.upperDDMFactor).toFixed(4)}`;
+  } else {
+    ["outputLowerAlarm","outputMiddleAlarm","outputUpperAlarm90","outputUpperAlarm150"].forEach(id => document.getElementById(id).textContent = "Invalid input");
+  }
+}
+
+/* ── CATEGORY FILTERS ── */
+function filterCategory() {
+  const cat = document.getElementById('categorySelect').value;
+  const data = {
+    cat1:{icao:'35 FT or 10.5 M or ±14.6 MKA',alarm:'±15 MKA',aai:'±12 MKA'},
+    cat2:{icao:'25 FT or 7.5 M or ±10.4 MKA',alarm:'±11 MKA',aai:'±9 MKA'},
+    cat3:{icao:'10 FT or 3 M or ±4.2 MKA',alarm:'±8 MKA',aai:'±6 MKA'}
+  };
+  const d = data[cat];
+  document.getElementById('limitsTableBody').innerHTML = `<tr><td>CENTER LINE</td><td>${cat.toUpperCase()}</td><td>${d.icao}</td><td>${d.alarm}</td><td>${d.aai}</td></tr>`;
+}
+function filterCategoryGP() {
+  const cat = document.getElementById('categorySelectGP').value;
+  const data = {
+    cat1:{icao:'7.5%',alarm:'±45 MKA',aai:'±35 MKA'},
+    cat2:{icao:'7.5%',alarm:'±45 MKA',aai:'±35 MKA'},
+    cat3:{icao:'4.0%',alarm:'±24 MKA',aai:'±24 MKA'}
+  };
+  const d = data[cat];
+  document.getElementById('limitsTableBodyGP').innerHTML = `<tr><td>GLIDE ANGLE</td><td>${cat.toUpperCase()}</td><td>${d.icao}</td><td>${d.alarm}</td><td>${d.aai}</td></tr>`;
+}
+
+/* ── ICAO LIMITS DATA ── */
+const llzData = {
+  cat1:[
+    {l:'Frequency',i:'108 – 111.975 MHz',a:'±0.002%',r:'NA'},
+    {l:'Coverage',i:'46.3 km (25 NM) within ±10°; 31.5 km (17 NM) within 10°–35°; 18.5 km (10 NM) outside ±35°',a:'NA',r:'May reduce to 33.3 km within ±10° sector'},
+    {l:'Course Width',i:'17%',a:'±15%',r:'SBO Power Adjustments'},
+    {l:'Center Line Deviation',i:'35 FT or 10.5 M',a:'±15 MKA',r:'NA'},
+    {l:'DDM & SDM',i:'20±2 & 40±2',a:'NA',r:'NA'},
+    {l:'90/150 Hz Frequency',i:'2.5%',a:'NA',r:'Recommended 1.5%'},
+    {l:'90/150 Hz Modulation',i:'20±2 & 20±2',a:'NA',r:'NA'},
+    {l:'90/150 Hz Phasing',i:'20°',a:'NA',r:'Phase Difference Limits'},
+    {l:'Zero Radiation Period',i:'10 Seconds',a:'NA',r:'Monitor Action Time'},
+    {l:'Field Strength',i:'≥90 µV/m (−107 dBW/m²) from 18.5 km to 60 m above threshold',a:'NA',r:'≥40 µV/m (−114 dBW/m²)'},
+    {l:'Course Structure',i:'To Point A: 0.031 (30 MKA); A→B: 0.031→0.015; B→C: 0.015',a:'NA',r:'NA'}
+  ],
+  cat2:[
+    {l:'Frequency',i:'108 – 111.975 MHz',a:'±0.002%',r:'NA'},
+    {l:'Coverage',i:'46.3 km (25 NM) within ±10°; 31.5 km (17 NM) within 10°–35°; 18.5 km (10 NM) outside ±35°',a:'NA',r:'May reduce to 33.3 km within ±10° sector'},
+    {l:'Course Width',i:'17%',a:'±15%',r:'SBO Power Adjustments'},
+    {l:'Center Line Deviation',i:'25 FT or 7.5 M',a:'±11 MKA',r:'NA'},
+    {l:'90/150 Hz Frequency',i:'1.5%',a:'NA',r:'Recommended 1.5%'},
+    {l:'90/150 Hz Modulation',i:'20±2 & 20±2',a:'NA',r:'NA'},
+    {l:'90/150 Hz Phasing',i:'20°',a:'NA',r:'Phase Difference Limits'},
+    {l:'Zero Radiation Period',i:'05 Seconds',a:'NA',r:'Monitor Action Time'},
+    {l:'Field Strength',i:'≥100 µV/m at 18.5 km → ≥200 µV/m at 15 m above threshold',a:'NA',r:'NA'},
+    {l:'Course Structure',i:'To A: 0.031; A→B: 0.031→0.005; B to datum: 0.005',a:'NA',r:'NA'}
+  ],
+  cat3:[
+    {l:'Frequency',i:'108 – 111.975 MHz',a:'±0.002%',r:'NA'},
+    {l:'Coverage',i:'46.3 km (25 NM) within ±10°; 31.5 km (17 NM) within 10°–35°; 18.5 km (10 NM) outside ±35°',a:'NA',r:'NA'},
+    {l:'Course Width',i:'10%',a:'±10%',r:'SBO Power Adjustments'},
+    {l:'Center Line Deviation',i:'10 FT or 3 M',a:'±08 MKA',r:'Alarm at 20 FT or 6 M'},
+    {l:'90/150 Hz Frequency',i:'1%',a:'NA',r:'NA'},
+    {l:'90/150 Hz Modulation',i:'20±2 & 20±2',a:'NA',r:'NA'},
+    {l:'90/150 Hz Phasing',i:'20°',a:'NA',r:'Phase Difference Limits'},
+    {l:'Zero Radiation Period',i:'02 Seconds',a:'NA',r:'Monitor Action Time'},
+    {l:'Field Strength',i:'≥100 µV/m at 18.5 km → ≥200 µV/m at 6 m; ≥100 µV/m at 4 m height along runway',a:'NA',r:'NA'},
+    {l:'Course Structure',i:'Datum→D: 0.005; D→E: 0.005→0.010',a:'NA',r:'NA'}
+  ]
+};
+const gpData = {
+  cat1:[
+    {l:'Frequency',i:'328.6 – 335.4 MHz',a:'±0.002%',r:'NA'},
+    {l:'Coverage',i:'±8° azimuth to 18.5 km; 1.75θ down to 0.45θ (or 0.30θ)',a:'NA',r:'NA'},
+    {l:'Half Course Width',i:'0.36θ',a:'0.07θ to 0.14θ',r:'SBO Power Adjustments'},
+    {l:'Glide Angle',i:'7.5%',a:'±45 MKA',r:'Given at ±35 MKA'},
+    {l:'Angular Displacement Sensitivity',i:'25%',a:'NA',r:'NA'},
+    {l:'DDM & SDM',i:'40±2.5 & 80±5',a:'NA',r:'NA'},
+    {l:'90/150 Hz Frequency',i:'2.5%',a:'NA',r:'Recommended 1.5%'},
+    {l:'90/150 Hz Modulation',i:'25±2.5 & 55±2.5',a:'NA',r:'NA'},
+    {l:'90/150 Hz Phasing',i:'20°',a:'NA',r:'Phase Difference Limits'},
+    {l:'Zero Radiation Period',i:'10 Seconds',a:'NA',r:'Monitor Action Time'},
+    {l:'Field Strength',i:'≥400 µV/m (−95 dBW/m²)',a:'NA',r:'Down to 30 m (100 ft)'},
+    {l:'Course Structure',i:'Outer limit to Point C: 0.035',a:'NA',r:'NA'}
+  ],
+  cat2:[
+    {l:'Frequency',i:'328.6 – 335.4 MHz',a:'±0.002%',r:'NA'},
+    {l:'Coverage',i:'±8° azimuth to 18.5 km; 1.75θ down to 0.45θ',a:'NA',r:'NA'},
+    {l:'Half Course Width',i:'0.36θ',a:'0.12θ ±0.02θ below; 0.12θ +0.02/−0.05θ above',r:'SBO Power Adjustments'},
+    {l:'Glide Angle',i:'7.5%',a:'±45 MKA',r:'Given at ±35 MKA'},
+    {l:'Angular Displacement Sensitivity',i:'25%',a:'NA',r:'NA'},
+    {l:'DDM & SDM',i:'40±2.5 & 80±5',a:'NA',r:'NA'},
+    {l:'90/150 Hz Frequency',i:'1.5%',a:'NA',r:'NA'},
+    {l:'90/150 Hz Modulation',i:'25±2.5 & 55±2.5',a:'NA',r:'NA'},
+    {l:'90/150 Hz Phasing',i:'20°',a:'NA',r:'Phase Difference Limits'},
+    {l:'Zero Radiation Period',i:'05 Seconds',a:'NA',r:'Monitor Action Time'},
+    {l:'Field Strength',i:'≥400 µV/m',a:'NA',r:'Down to 15 m (50 ft)'},
+    {l:'Course Structure',i:'To A: 0.035; A→B: 0.035→0.023; B to datum: 0.023',a:'NA',r:'NA'}
+  ],
+  cat3:[
+    {l:'Frequency',i:'328.6 – 335.4 MHz',a:'±0.002%',r:'NA'},
+    {l:'Coverage',i:'±8° azimuth to 18.5 km; 1.75θ down to 0.45θ',a:'NA',r:'NA'},
+    {l:'Half Course Width',i:'0.36θ',a:'0.12θ ±0.02θ below; 0.12θ +0.02/−0.05θ above',r:'SBO Power Adjustments'},
+    {l:'Glide Angle',i:'4%',a:'±24 MKA',r:'Given at ±24 MKA'},
+    {l:'Angular Displacement Sensitivity',i:'25%',a:'NA',r:'NA'},
+    {l:'DDM & SDM',i:'40±2.5 & 80±5',a:'NA',r:'NA'},
+    {l:'90/150 Hz Frequency',i:'1.5%',a:'NA',r:'NA'},
+    {l:'90/150 Hz Modulation',i:'25±2.5 & 55±2.5',a:'NA',r:'NA'},
+    {l:'90/150 Hz Phasing',i:'20°',a:'NA',r:'Phase Difference Limits'},
+    {l:'Zero Radiation Period',i:'05 Seconds',a:'NA',r:'Monitor Action Time'},
+    {l:'Field Strength',i:'≥400 µV/m',a:'NA',r:'Down to 15 m (50 ft)'},
+    {l:'Course Structure',i:'To A: 0.035; A→B: 0.035→0.023; B to datum: 0.023',a:'NA',r:'NA'}
+  ]
+};
+function filterCategoryLimits() {
+  const cat = document.getElementById('categorySelectLimits').value;
+  function fill(id, rows) {
+    const tb = document.getElementById(id); tb.innerHTML = '';
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${r.l}</td><td>${r.i}</td><td>${r.a}</td><td>${r.r}</td>`;
+      tb.appendChild(tr);
+    });
+  }
+  fill('llzLimitsTableBodyLimits', llzData[cat]);
+  fill('gpLimitsTableBodyLimits', gpData[cat]);
+}
+
+/* ── UTILS ── */
+function resetValues() {
+  document.querySelectorAll('input[type="number"],input[type="text"]').forEach(i => { if (i.id !== 'angleAssign') i.value = ''; });
+  document.querySelectorAll('.rv').forEach(o => o.textContent = '—');
+  ['a1-height','a1-slot','a2-height','a2-slot','a3-height','a3-slot'].forEach(id => { const e = document.getElementById(id); if(e) e.textContent = '—'; });
+}
+function printPage() { window.print(); }
+
+/* ── INIT ── */
+window.addEventListener('DOMContentLoaded', () => {
+  filterCategory(); filterCategoryGP(); filterCategoryLimits();
+});
+</script>
+</body>
+</html>
